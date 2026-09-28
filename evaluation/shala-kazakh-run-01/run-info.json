@@ -1,0 +1,12 @@
+{
+  "meeting_id": "d8ac5a1cc4cd459d8bddc89f08953a30",
+  "audio": "meeting-3-shala-kazakh.mp3",
+  "language": "Kazakh-Russian code-switched (Shala-Kazakh)",
+  "expected_action_count": 4,
+  "result_json_available": false,
+  "preserved_artifacts": [
+    "minutes.pdf",
+    "minutes.docx"
+  ],
+  "note": "Original API JSON response was not persisted. Evaluation uses the preserved PDF and DOCX from the original run. The meeting was not rerun."
+}

@@ -1,0 +1,71 @@
+{
+  "test": "Shala-Kazakh Run 01",
+  "language": "Kazakh-Russian code-switched",
+  "expected_action_count": 4,
+  "detected_action_count": 12,
+
+  "metrics": {
+    "action_count": null,
+    "task_accuracy": null,
+    "owner_accuracy": 1.0,
+    "deadline_accuracy": 0.75,
+    "duplicate_count": null,
+    "semantic_task_coverage": 1.0,
+    "over_generation_factor": 3.0,
+    "duplicate_or_fragment_records": 7,
+    "unmapped_action_records": 1
+  },
+
+  "actions": [],
+
+  "ground_truth_mapping": [
+    {
+      "ground_truth_id": 1,
+      "owner": "Nurlan",
+      "expected_deadline": "Friday",
+      "related_detected_actions": [1, 2, 9]
+    },
+    {
+      "ground_truth_id": 2,
+      "owner": "Daniyar",
+      "expected_deadline": "Monday",
+      "related_detected_actions": [3, 4, 5, 10]
+    },
+    {
+      "ground_truth_id": 3,
+      "owner": "Marat",
+      "expected_deadline": "Next Wednesday",
+      "related_detected_actions": [6, 7, 11]
+    },
+    {
+      "ground_truth_id": 4,
+      "owner": "Daniyar",
+      "expected_deadline": null,
+      "related_detected_actions": [8]
+    }
+  ],
+
+  "notes": {
+    "stt_errors": [
+      "All four ground-truth task owners were semantically identified. The transcription produced spelling variations of Daniyar's name, including Даньяр, Данияр, Даняар."
+    ],
+    "diarization_errors": [],
+    "extraction_errors": [
+      "All 4 ground-truth tasks were represented, but assignments were fragmented and repeated across multiple detected action records. The system produced 12 records for 4 expected tasks.",
+      "Deadline extraction succeeded for Friday, next Wednesday, and the intentionally unspecified training deadline. The Monday deadline was present or partially represented in task text but was not extracted into the structured deadline field.",
+      "Seven additional records were generated through fragmentation or repetition of four valid ground-truth assignments. One additional record remained unmapped and was not automatically classified as a duplicate."
+    ]
+  },
+
+  "summary": {
+    "ground_truth_tasks": 4,
+    "detected_action_records": 12,
+    "semantic_task_coverage": 1.0,
+    "semantic_owner_accuracy": 1.0,
+    "structured_deadline_accuracy": 0.75,
+    "over_generation_factor": 3.0,
+    "duplicate_or_fragment_records": 7,
+    "unmapped_action_records": 1,
+    "overall_interpretation": "The pipeline represented all four intended assignments and their responsible owners, but code-switched speech and transcription variability contributed to substantial action fragmentation and repetition. Structured deadline extraction succeeded for three of four ground-truth tasks."
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "audio": "meeting-3-shala-kazakh.mp3",
+  "language": "Kazakh-Russian code-switched (Shala-Kazakh)",
+  "expected_action_count": 4,
+  "actions": [
+    {
+      "owner": "Nurlan",
+      "task": "Collect missing supplier documents",
+      "deadline": "Friday"
+    },
+    {
+      "owner": "Daniyar",
+      "task": "Check warehouse employee accounts and report errors",
+      "deadline": "Monday"
+    },
+    {
+      "owner": "Marat",
+      "task": "Prepare updated fire safety instructions",
+      "deadline": "Next Wednesday"
+    },
+    {
+      "owner": "Daniyar",
+      "task": "Organize training for warehouse employees on the new system",
+      "deadline": null
+    }
+  ]
+}
