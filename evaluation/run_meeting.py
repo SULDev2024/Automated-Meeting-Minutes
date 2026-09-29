@@ -33,6 +33,23 @@ MODELS = {
     "llm": "groq:openai/gpt-oss-120b",
 }
 LLM_MODEL = "openai/gpt-oss-120b"
+USAGE = {"llm_calls": 0, "prompt_tokens": 0, "completion_tokens": 0}
+
+
+def count_usage(client):
+    """Wrap a Groq client so every chat call adds its token usage to USAGE."""
+    create = client.chat.completions.create
+
+    def counted(*args, **kwargs):
+        response = create(*args, **kwargs)
+        USAGE["llm_calls"] += 1
+        if getattr(response, "usage", None):
+            USAGE["prompt_tokens"] += response.usage.prompt_tokens or 0
+            USAGE["completion_tokens"] += response.usage.completion_tokens or 0
+        return response
+
+    client.chat.completions.create = counted
+    return client
 
 
 def git_commit():
@@ -105,7 +122,7 @@ Return valid JSON only:
   ]
 }}
 """
-    client = Groq(api_key=os.getenv("GROQ_API_KEY"), max_retries=8)
+    client = count_usage(Groq(api_key=os.getenv("GROQ_API_KEY"), max_retries=8))
     response = client.chat.completions.create(
         model=LLM_MODEL,
         messages=[{"role": "user", "content": prompt}],
@@ -131,7 +148,7 @@ def run_pipeline(segments: list, meeting_language: str, v1: bool = False) -> dic
 
     # Evaluation runs hit rate limits and network drops far more often than
     # single uploads; let the SDK retry with backoff instead of failing.
-    extractor.client = extractor.client.with_options(max_retries=8)
+    extractor.client = count_usage(extractor.client.with_options(max_retries=8))
     result = extractor.extract_meeting_actions(segments, meeting_language=meeting_language)
     # The pipeline records a failed LLM call as an unresolved candidate and
     # carries on. Such a run measures the API, not the method: reject it.
@@ -198,6 +215,7 @@ def main():
             "meeting_language": meeting_language,
             "models": MODELS,
             "git_commit": git_commit(),
+            "llm_usage": USAGE,
             "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         },
         "transcription": transcription,

@@ -129,10 +129,10 @@ def resolve_single_candidate(
                 )
                 time.sleep(retry_wait_seconds)
                 continue
-            return unresolved_candidate_result(
+            return [unresolved_candidate_result(
                 candidate,
                 f"LLM call failed: {error}"
-            )
+            )]
     results = (
         response.get("results", [])
         if isinstance(response, dict)
@@ -148,24 +148,63 @@ def resolve_single_candidate(
             result.get("candidate_segment_ids")
         ) == sent_ids
     ]
+    if len(matching) > 1:
+        return _accept_multiple_results(candidate, matching)
     if len(matching) != 1:
-        return unresolved_candidate_result(
+        return [unresolved_candidate_result(
             candidate,
             f"Expected exactly one result for the sent candidate, "
             f"got {len(matching)} matching of {len(results)} returned"
-        )
+        )]
     result = dict(matching[0])
     if result.get("is_action") not in (True, False):
-        return unresolved_candidate_result(
+        return [unresolved_candidate_result(
             candidate,
             "Result has no explicit is_action decision"
-        )
+        )]
     # Keep the exact IDs we sent (order and spelling).
     result["candidate_segment_ids"] = list(
         candidate.get("candidate_segment_ids", [])
     )
     result["resolution_status"] = "resolved"
-    return result
+    return [result]
+
+
+def _accept_multiple_results(candidate: dict, matching: list):
+    """
+    The detector sometimes merges several passages into one candidate
+    (e.g. a whole meeting), and the resolver then correctly returns one
+    action per passage. Rejecting all of them loses every action, so
+    accept them when each one is independently grounded: an explicit
+    decision, evidence inside the candidate's context window, and
+    evidence not identical to another accepted result.
+    """
+    context_ids = {
+        s.get("segment_id")
+        for s in candidate.get("context_segments", [])
+    }
+    accepted, seen = [], set()
+    for item in matching:
+        if item.get("is_action") not in (True, False):
+            continue
+        evidence = frozenset(item.get("evidence_segment_ids") or [])
+        if item.get("is_action") is True and (
+            not evidence or not evidence <= context_ids or evidence in seen
+        ):
+            continue
+        seen.add(evidence)
+        result = dict(item)
+        result["candidate_segment_ids"] = list(
+            candidate.get("candidate_segment_ids", [])
+        )
+        result["resolution_status"] = "resolved_multi"
+        accepted.append(result)
+    if not accepted:
+        return [unresolved_candidate_result(
+            candidate,
+            f"{len(matching)} results for one candidate, none grounded"
+        )]
+    return accepted
 
 
 def resolve_candidates_batched(
@@ -187,7 +226,7 @@ def resolve_candidates_batched(
         print(
             f"Resolving candidate {number} of {len(candidates)}"
         )
-        all_results.append(
+        all_results.extend(
             resolve_single_candidate(
                 candidate,
                 meeting_language=meeting_language
@@ -243,7 +282,10 @@ def validate_candidate_resolution(
         items = decisions.get(ids, [])
         if not items:
             continue
-        if len(items) > 1:
+        multi = all(
+            r.get("resolution_status") == "resolved_multi" for r in items
+        )
+        if len(items) > 1 and not multi:
             errors.append(
                 f"Candidate {number} has {len(items)} decisions: "
                 f"{sorted(ids)}"
@@ -397,6 +439,10 @@ Each transcript line begins with a segment ID such as [SEG_042].
 For every possible action, return ONLY the IDs of the transcript
 segments that contain or directly support that action.
 
+Return ONE candidate per distinct action. Never put two different
+tasks, or tasks for different people, into the same candidate, even
+when they are discussed close together or repeated in a summary.
+
 Include segments containing:
 - the instruction or commitment
 - the person's name when relevant
@@ -425,6 +471,39 @@ Return an empty candidates list if there are no candidates.
     )
 
     return json.loads(response.choices[0].message.content)
+
+
+def candidate_covers_meeting(candidates: dict, segment_count: int):
+    """
+    True when one candidate spans a large part of the meeting, which
+    means the detector merged several actions into it.
+    """
+    limit = max(6, int(0.4 * segment_count))
+    for candidate in candidates.get("candidates", []):
+        numbers = []
+        for segment_id in candidate.get("segment_ids", []):
+            try:
+                numbers.append(int(segment_id.replace("SEG_", "")))
+            except (ValueError, AttributeError):
+                continue
+        if numbers and max(numbers) - min(numbers) + 1 > limit:
+            return True
+    return False
+
+
+def find_action_candidates_checked(transcript: str, segment_count: int):
+    """
+    Candidate detection with one retry when the detector merges a large
+    part of the meeting into a single candidate (observed on
+    development meetings in about 5 of 6 runs of one recording).
+    """
+    candidates = find_action_candidates(transcript)
+    if candidate_covers_meeting(candidates, segment_count):
+        print("Candidate detection merged the meeting; retrying once")
+        retry = find_action_candidates(transcript)
+        if not candidate_covers_meeting(retry, segment_count):
+            return retry
+    return candidates
 
 
 def extract_action_items(transcript: str):
@@ -1662,7 +1741,10 @@ def extract_meeting_actions(
     # 1. Build indexed transcript
     transcript = build_indexed_transcript(segments)
     # 2. Detect action candidates
-    candidates = find_action_candidates(transcript)
+    candidates = find_action_candidates_checked(
+        transcript,
+        segment_count=len(segments)
+    )
     # 3. Add surrounding conversation context
     candidates_with_context = attach_candidate_context(
         segments,

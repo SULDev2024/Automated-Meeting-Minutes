@@ -94,7 +94,7 @@ Rules:
 Return valid JSON only, one entry per prediction:
 {{"alignments": [{{"pred": 0, "gold": "T1"}}]}}
 """
-    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"), max_retries=8)
     response = client.chat.completions.create(
         model=LLM_MODEL,
         messages=[{"role": "user", "content": prompt}],
