@@ -214,6 +214,9 @@ def main():
     for path in glob(os.path.join(args.gold_dir, "*.json")):
         with open(path, encoding="utf-8") as f:
             gold = json.load(f)
+        if not isinstance(gold, dict) or not {"meeting_id", "speakers", "tasks"} <= gold.keys():
+            print(f"skip {path}: not in the ground-truth format (see evaluation/README.md)")
+            continue
         golds[gold["meeting_id"]] = gold
 
     groups = defaultdict(lambda: defaultdict(int))
