@@ -3,3 +3,6 @@
 __pycache__/
 *.pyc
 exports/
+
+# Evaluation run outputs (contain meeting transcripts)
+evaluation/runs/
